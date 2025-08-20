@@ -516,6 +516,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - Improving standardization methodology
 - Enhancing the user interface
 - Adding new analysis domains beyond healthcare
+- This repository welcomes contributions via pull requests. Direct pushes to the main branch are not permitted. Please fork the repository and submit your changes via pull request for review.
 
 ## 📄 License
 
