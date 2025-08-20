@@ -1,0 +1,89 @@
+services:
+  # Ollama - Local LLM Server with GPU support
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./models:/root/.ollama
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - ai-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # If GPU setup failed, comment out the deploy section above
+
+  # ChromaDB - Vector Database
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+    networks:
+      - ai-network
+
+  # Jupyter Lab - Development Environment
+  jupyter:
+    build: 
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: ai-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./projects:/home/jovyan/projects
+      - ./data:/home/jovyan/data
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=your-secure-token-here
+    depends_on:
+      - ollama
+      - chromadb
+    restart: unless-stopped
+    networks:
+      - ai-network
+
+  # Streamlit Server
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: ai-streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount the function files from notebooks subfolder
+      - ./notebooks/crewai_functions.py:/app/crewai_functions.py
+      - ./notebooks/langchain_functions.py:/app/langchain_functions.py
+      - ./notebooks/langgraph_functions.py:/app/langgraph_functions.py
+      - ./notebooks/llamaindex_functions.py:/app/llamaindex_functions.py
+      - ./notebooks/streamlit_multi_agent_app.py:/app/streamlit_multi_agent_app.py
+      # Mount projects directory for saving results
+      - ./projects:/app/projects
+    depends_on:
+      - ollama
+      - chromadb
+      - jupyter
+    restart: unless-stopped
+    networks:
+      - ai-network
+
+# Define explicit network
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  chroma-data:

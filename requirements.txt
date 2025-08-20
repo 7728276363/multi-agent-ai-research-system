@@ -1,0 +1,17 @@
+streamlit
+plotly
+langchain
+langchain-community
+langchain-ollama
+langchain-experimental
+llama-index
+llama-index-core
+llama-index-llms-ollama
+llama-index-embeddings-ollama
+langgraph
+crewai
+sentence-transformers
+pypdf
+python-docx
+tiktoken
+requests

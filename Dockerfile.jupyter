@@ -1,0 +1,40 @@
+FROM jupyter/scipy-notebook:latest
+
+USER root
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+USER jovyan
+
+# Install Python packages - using latest versions to avoid conflicts
+RUN pip install --no-cache-dir \
+    langchain \
+    langchain-community \
+    langchain-experimental \
+    langchain-ollama \
+    langgraph \
+    llama-index \
+    llama-index-llms-ollama \
+    llama-index-embeddings-ollama \
+    chromadb \
+    ollama \
+    crewai \
+    streamlit \
+    gradio \
+    sentence-transformers \
+    pypdf \
+    python-docx \
+    tiktoken \
+    openai \
+    python-dotenv \
+    plotly \
+    requests
+
+# Create directories
+RUN mkdir -p /home/jovyan/notebooks /home/jovyan/projects /home/jovyan/data
+
+WORKDIR /home/jovyan
