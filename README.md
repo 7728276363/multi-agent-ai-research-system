@@ -7,6 +7,7 @@ A professional AI development environment with Docker containers for comparing A
 ### Prerequisites
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
 - NVIDIA GPU with [NVIDIA Docker support](https://github.com/NVIDIA/nvidia-docker) (optional, for GPU acceleration)
+- Please see my [a relative link: NVIDIA_CUDA_Guide.md]
 
 ### One-Command Setup
 ```bash
@@ -203,6 +204,8 @@ docker-compose restart ollama
 
 # Update AI model
 docker-compose exec ollama ollama pull llama3.1:8b-instruct-q4_K_M
+# This model will likely be needed to support your Jupyter-Lab environment
+docker-compose exec ollama ollama pull nomic-embed-text
 ```
 
 ### Troubleshooting
@@ -508,6 +511,10 @@ The system tracks and compares:
 - **Reliability**: Success rates and error handling
 - **Resource Usage**: Memory and computation efficiency
 - **Scalability**: Performance with complex topics
+
+## Please Note
+Depending on how many CUDA and Tensors cores your graphics card has, along with the amount of available VRAM will determine how long these models take to complete.  
+If you have less than 12GB VRAM, then you will like want to consider running a small llama model.
 
 ## 🤝 Contributing
 
