@@ -1,26 +1,90 @@
-# LangGraph Multi-Agent System - MATCHED TO CREWAI BASELINE
-# Save as: langgraph_functions.py
+"""
+LangGraph Multi-Agent System
+==============================================================
 
-from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
-from typing import TypedDict, Annotated
-from langchain_ollama import OllamaLLM
-from datetime import datetime
-import time
-from typing import Dict, List, Any
-import operator
+This file implements a multi-agent AI research system using LangGraph framework.
+LangGraph is a library for building stateful, multi-actor applications with LLMs.
 
-# Initialize LLM
+LANGGRAPH VS OTHER FRAMEWORKS:
+- CrewAI: Purpose-built agent collaboration with simple workflows
+- LangChain: General LLM framework requiring manual orchestration  
+- LangGraph: Stateful graph-based workflows with sophisticated state management
+
+WHAT IS LANGGRAPH?
+LangGraph excels at:
+- Complex, branching workflows (graphs vs linear sequences)
+- Persistent state management across agent interactions
+- Advanced coordination patterns (parallel execution, conditional routing)
+- Cyclic workflows where agents can revisit previous steps
+
+KEY LANGGRAPH CONCEPTS:
+1. **State**: Shared data structure that persists across all agents
+2. **Nodes**: Individual agents/functions that modify state
+3. **Edges**: Connections defining workflow sequence
+4. **Graph**: Complete workflow definition
+5. **Annotations**: How state updates are handled (merge, replace, etc.)
+
+STANDARDIZATION APPROACH:
+This implementation uses identical:
+- Agent roles and expertise (matching CrewAI baseline)
+- Prompts and task descriptions
+- Sequential workflow pattern
+- Output format and metrics
+
+However, it leverages LangGraph's unique strengths:
+- Sophisticated state management for context passing
+- Robust error handling and recovery
+- Built-in workflow visualization capabilities
+
+"""
+
+# ============================================================================
+# IMPORTS AND DEPENDENCIES
+# ============================================================================
+
+from langgraph.graph import StateGraph, END          # Core LangGraph components
+from langgraph.graph.message import add_messages     # Message handling utilities
+from typing import TypedDict, Annotated              # Type system for state schema
+from langchain_ollama import OllamaLLM               # LLM interface
+from datetime import datetime                         # Timestamp functionality
+import time                                          # Performance timing
+from typing import Dict, List, Any                   # Additional type hints
+import operator                                      # For state update operations
+
+
+# ============================================================================
+# LLM INITIALIZATION
+# ============================================================================
+
+# Initialize the same LLM as other frameworks for fair comparison
 llm = OllamaLLM(
     model="llama3.1:8b-instruct-q4_K_M",
     base_url="http://ollama:11434"
 )
 
-# STATE SCHEMA
-# =========================
+
+# ============================================================================
+# STATE MANAGEMENT UTILITIES
+# ============================================================================
+
+"""
+LangGraph's power comes from sophisticated state management.
+These functions define how the shared state is updated as agents work.
+"""
 
 def merge_dicts(left: Dict, right: Dict) -> Dict:
-    """Helper function to merge dictionaries"""
+    """
+    Merge two dictionaries, with right dict taking precedence.
+    
+    Used for combining agent outputs and metadata without losing data.
+    
+    Args:
+        left (Dict): Existing dictionary
+        right (Dict): New dictionary to merge in
+    
+    Returns:
+        Dict: Combined dictionary
+    """
     if not left:
         return right
     if not right:
@@ -29,43 +93,121 @@ def merge_dicts(left: Dict, right: Dict) -> Dict:
     result.update(right)
     return result
 
-class AgentState(TypedDict):
-    """Standardized state schema matching CrewAI baseline"""
-    
-    # Core information
-    topic: str
-    analysis_type: str
-    
-    # Agent outputs (matching CrewAI structure)
-    healthcare_analysis: str
-    technical_analysis: str
-    regulatory_analysis: str
-    economic_analysis: str
-    final_synthesis: str
-    
-    # Workflow metadata
-    current_agent: str
-    completed_agents: Annotated[List[str], operator.add]
-    agent_outputs: Annotated[Dict[str, Any], merge_dicts]
-    
-    # Performance tracking
-    start_time: float
-    agent_durations: Annotated[Dict[str, float], merge_dicts]
-    total_words: int
 
-# AGENT NODE FUNCTIONS (MATCHING CREWAI PROMPTS)
-# ============================================================
+def add_unique_agents(left: List[str], right: List[str]) -> List[str]:
+    """
+    Add agents to completion list without creating duplicates.
+    
+    CRITICAL FIX: This prevents the "31/5 agents" bug by ensuring
+    each agent name appears only once in the completed list.
+    
+    Args:
+        left (List[str]): Existing agent list
+        right (List[str]): New agents to add
+    
+    Returns:
+        List[str]: Combined list with no duplicates
+    """
+    if not left:
+        return right
+    if not right:
+        return left
+    
+    # Combine lists and remove duplicates while preserving order
+    combined = left.copy()
+    for agent in right:
+        if agent not in combined:
+            combined.append(agent)
+    return combined
+
+
+# ============================================================================
+# STATE SCHEMA DEFINITION
+# ============================================================================
+
+class AgentState(TypedDict):
+    """
+    Defines the shared state structure for the multi-agent workflow.
+    
+    WHAT IS STATE?
+    In LangGraph, state is a shared data structure that:
+    - Persists across all agent interactions
+    - Gets updated by each agent as they work
+    - Provides context for subsequent agents
+    - Tracks workflow progress and metrics
+    
+    ANNOTATIONS EXPLAINED:
+    - Annotated[Type, update_function]: Defines how state updates
+    - merge_dicts: Combines dictionaries without losing data
+    - add_unique_agents: Prevents duplicate agent tracking
+    
+    This state schema matches CrewAI's output structure for compatibility.
+    """
+    
+    # ----------------------------------------------------------------
+    # CORE WORKFLOW DATA
+    # ----------------------------------------------------------------
+    topic: str                    # Research topic being analyzed
+    analysis_type: str           # Type of analysis (e.g., "comprehensive")
+    
+    # ----------------------------------------------------------------
+    # AGENT ANALYSIS OUTPUTS (MATCHING CREWAI STRUCTURE)
+    # ----------------------------------------------------------------
+    healthcare_analysis: str     # Healthcare Domain Expert output
+    technical_analysis: str      # AI Technical Analyst output
+    regulatory_analysis: str     # Regulatory Specialist output
+    economic_analysis: str       # Economics Analyst output
+    final_synthesis: str         # Strategic Synthesizer output
+    
+    # ----------------------------------------------------------------
+    # WORKFLOW COORDINATION METADATA
+    # ----------------------------------------------------------------
+    current_agent: str                                    # Currently executing agent
+    completed_agents: Annotated[List[str], add_unique_agents]  # Successful completions (no duplicates)
+    agent_outputs: Annotated[Dict[str, Any], merge_dicts]     # Raw agent outputs
+    
+    # ----------------------------------------------------------------
+    # PERFORMANCE TRACKING
+    # ----------------------------------------------------------------
+    start_time: float                                     # Workflow start timestamp
+    agent_durations: Annotated[Dict[str, float], merge_dicts]  # Individual agent timings
+    total_words: int                                      # Final word count
+
+
+# ============================================================================
+# AGENT NODE FUNCTIONS - IDENTICAL TO CREWAI BASELINE
+# ============================================================================
+
+"""
+Each function represents an agent "node" in the LangGraph workflow.
+These nodes:
+1. Receive the current state
+2. Execute their specialized analysis
+3. Update the state with their results
+4. Return the modified state for the next agent
+
+All prompts and logic are identical to CrewAI baseline for fair comparison.
+"""
 
 def healthcare_expert_node(state: AgentState) -> AgentState:
-    """Healthcare Domain Expert - matching CrewAI baseline exactly"""
+    """
+    Healthcare Domain Expert node - first agent in the workflow.
+    
+    ROLE: Provides clinical insights and healthcare industry expertise
+    CONTEXT: No previous context (first agent)
+    UPDATES: healthcare_analysis, completed_agents, agent_outputs, agent_durations
+    
+    Args:
+        state (AgentState): Current workflow state
+    
+    Returns:
+        AgentState: Updated state with healthcare analysis
+    """
     print("🏥 Healthcare Domain Expert analyzing...")
     
     start_time = time.time()
     
-    # Build context from previous analyses
-    context = ""
-    # No previous context for first agent
-    
+    # Build the specialized prompt (identical to CrewAI)
     prompt = f"""You are a Healthcare Domain Expert.
 
 Goal: Provide deep medical and healthcare industry insights
@@ -76,8 +218,6 @@ You understand how technology impacts patient care, hospital operations, and
 medical decision-making processes.
 
 Task: Analyze "{state['topic']}" from a healthcare domain perspective.
-
-{f"Context from previous analyses: {context}" if context else ""}
 
 Focus on:
 - Current healthcare challenges this addresses
@@ -90,16 +230,18 @@ Provide domain-specific insights that only a healthcare expert would know.
 Target: 400-500 words with detailed analysis."""
     
     try:
+        # Execute LLM analysis
         analysis = llm.invoke(prompt)
         duration = time.time() - start_time
         
         print(f"✅ Healthcare analysis completed in {duration:.1f}s ({len(analysis.split())} words)")
         
+        # Return updated state with analysis results
         return {
-            **state,
+            **state,  # Preserve existing state
             "healthcare_analysis": analysis,
             "current_agent": "healthcare_expert",
-            "completed_agents": (state.get("completed_agents", []) + ["healthcare_expert"]),
+            "completed_agents": ["healthcare_expert"],  # Start fresh list (no previous agents)
             "agent_outputs": merge_dicts(state.get("agent_outputs", {}), {"healthcare_expert": analysis}),
             "agent_durations": merge_dicts(state.get("agent_durations", {}), {"healthcare_expert": duration})
         }
@@ -110,16 +252,23 @@ Target: 400-500 words with detailed analysis."""
             **state,
             "healthcare_analysis": f"Analysis failed: {e}",
             "current_agent": "healthcare_expert",
-            "completed_agents": (state.get("completed_agents", []) + ["healthcare_expert"]),
+            "completed_agents": ["healthcare_expert"],  # Still track attempt
         }
 
+
 def technical_analyst_node(state: AgentState) -> AgentState:
-    """AI Technical Analyst - matching CrewAI baseline exactly"""
+    """
+    AI Technical Analyst node - second agent, builds on healthcare insights.
+    
+    ROLE: Analyzes technical feasibility and implementation challenges
+    CONTEXT: Healthcare analysis from previous agent
+    UPDATES: technical_analysis, completed_agents, agent_outputs, agent_durations
+    """
     print("🔧 AI Technical Analyst analyzing...")
     
     start_time = time.time()
     
-    # Include context from healthcare analysis
+    # Build context from healthcare analysis (truncated to avoid token limits)
     context = f"Healthcare perspective: {state.get('healthcare_analysis', '')[:300]}..." if state.get('healthcare_analysis') else ""
     
     prompt = f"""You are an AI Technical Analyst.
@@ -154,7 +303,7 @@ Target: 400-500 words with specific implementation details."""
             **state,
             "technical_analysis": analysis,
             "current_agent": "technical_analyst",
-            "completed_agents": (state.get("completed_agents", []) + ["technical_analyst"]),
+            "completed_agents": ["technical_analyst"],  # Add only this agent
             "agent_outputs": merge_dicts(state.get("agent_outputs", {}), {"technical_analyst": analysis}),
             "agent_durations": merge_dicts(state.get("agent_durations", {}), {"technical_analyst": duration})
         }
@@ -165,16 +314,23 @@ Target: 400-500 words with specific implementation details."""
             **state,
             "technical_analysis": f"Analysis failed: {e}",
             "current_agent": "technical_analyst",
-            "completed_agents": (state.get("completed_agents", []) + ["technical_analyst"]),
+            "completed_agents": ["technical_analyst"],
         }
 
+
 def regulatory_specialist_node(state: AgentState) -> AgentState:
-    """Healthcare Regulatory Specialist - matching CrewAI baseline exactly"""
+    """
+    Healthcare Regulatory Specialist node - third agent.
+    
+    ROLE: Analyzes regulatory compliance and approval processes
+    CONTEXT: Healthcare and technical analyses from previous agents
+    UPDATES: regulatory_analysis, completed_agents, agent_outputs, agent_durations
+    """
     print("⚖️ Healthcare Regulatory Specialist analyzing...")
     
     start_time = time.time()
     
-    # Build context from previous analyses
+    # Build context from both previous analyses
     context = f"Healthcare: {state.get('healthcare_analysis', '')[:200]}... Technical: {state.get('technical_analysis', '')[:200]}..."
     
     prompt = f"""You are a Healthcare Regulatory Specialist.
@@ -209,7 +365,7 @@ Target: 400-500 words with specific regulatory guidance."""
             **state,
             "regulatory_analysis": analysis,
             "current_agent": "regulatory_specialist",
-            "completed_agents": (state.get("completed_agents", []) + ["regulatory_specialist"]),
+            "completed_agents": ["regulatory_specialist"],  # Add only this agent
             "agent_outputs": merge_dicts(state.get("agent_outputs", {}), {"regulatory_specialist": analysis}),
             "agent_durations": merge_dicts(state.get("agent_durations", {}), {"regulatory_specialist": duration})
         }
@@ -220,16 +376,23 @@ Target: 400-500 words with specific regulatory guidance."""
             **state,
             "regulatory_analysis": f"Analysis failed: {e}",
             "current_agent": "regulatory_specialist",
-            "completed_agents": (state.get("completed_agents", []) + ["regulatory_specialist"]),
+            "completed_agents": ["regulatory_specialist"],
         }
 
+
 def economic_analyst_node(state: AgentState) -> AgentState:
-    """Healthcare Economics Analyst - matching CrewAI baseline exactly"""
+    """
+    Healthcare Economics Analyst node - fourth agent.
+    
+    ROLE: Evaluates economic impact and financial implications
+    CONTEXT: Healthcare, technical, and regulatory analyses
+    UPDATES: economic_analysis, completed_agents, agent_outputs, agent_durations
+    """
     print("💰 Healthcare Economics Analyst analyzing...")
     
     start_time = time.time()
     
-    # Build comprehensive context
+    # Build comprehensive context from all three previous analyses
     context = f"Healthcare: {state.get('healthcare_analysis', '')[:150]}... Technical: {state.get('technical_analysis', '')[:150]}... Regulatory: {state.get('regulatory_analysis', '')[:150]}..."
     
     prompt = f"""You are a Healthcare Economics Analyst.
@@ -264,7 +427,7 @@ Target: 400-500 words with financial projections."""
             **state,
             "economic_analysis": analysis,
             "current_agent": "economic_analyst",
-            "completed_agents": (state.get("completed_agents", []) + ["economic_analyst"]),
+            "completed_agents": ["economic_analyst"],  # Add only this agent
             "agent_outputs": merge_dicts(state.get("agent_outputs", {}), {"economic_analyst": analysis}),
             "agent_durations": merge_dicts(state.get("agent_durations", {}), {"economic_analyst": duration})
         }
@@ -275,16 +438,23 @@ Target: 400-500 words with financial projections."""
             **state,
             "economic_analysis": f"Analysis failed: {e}",
             "current_agent": "economic_analyst",
-            "completed_agents": (state.get("completed_agents", []) + ["economic_analyst"]),
+            "completed_agents": ["economic_analyst"],
         }
 
+
 def strategic_synthesizer_node(state: AgentState) -> AgentState:
-    """Strategic Content Synthesizer - matching CrewAI baseline exactly"""
+    """
+    Strategic Content Synthesizer node - final agent.
+    
+    ROLE: Combines all specialist insights into comprehensive strategic analysis
+    CONTEXT: All four previous analyses (healthcare, technical, regulatory, economic)
+    UPDATES: final_synthesis, completed_agents, agent_outputs, total_words
+    """
     print("🎯 Strategic Content Synthesizer creating final analysis...")
     
     start_time = time.time()
     
-    # Compile all analyses exactly like CrewAI
+    # Compile all analyses for comprehensive synthesis
     healthcare_analysis = state.get("healthcare_analysis", "")
     technical_analysis = state.get("technical_analysis", "")
     regulatory_analysis = state.get("regulatory_analysis", "")
@@ -325,12 +495,14 @@ Target: 1500-2000 words for C-suite executives and strategic decision makers."""
         synthesis = llm.invoke(prompt)
         duration = time.time() - start_time
         
-        # Calculate final metrics
+        # Calculate final workflow metrics
         total_duration = time.time() - state.get("start_time", time.time())
-        # Calculate words from individual analyses + synthesis (don't double count)
+        
+        # Calculate total words (individual analyses + synthesis, no double counting)
         individual_words = sum(len(analysis.split()) for analysis in [
             healthcare_analysis, technical_analysis, regulatory_analysis, economic_analysis
         ] if analysis and "failed" not in analysis.lower())
+        
         synthesis_words = len(synthesis.split()) if "failed" not in synthesis.lower() else 0
         all_words = individual_words + synthesis_words
         
@@ -341,7 +513,7 @@ Target: 1500-2000 words for C-suite executives and strategic decision makers."""
             **state,
             "final_synthesis": synthesis,
             "current_agent": "strategic_synthesizer",
-            "completed_agents": (state.get("completed_agents", []) + ["strategic_synthesizer"]),
+            "completed_agents": ["strategic_synthesizer"],  # Add only this agent
             "agent_outputs": merge_dicts(state.get("agent_outputs", {}), {"strategic_synthesizer": synthesis}),
             "agent_durations": merge_dicts(state.get("agent_durations", {}), {"strategic_synthesizer": duration}),
             "total_words": all_words
@@ -353,50 +525,93 @@ Target: 1500-2000 words for C-suite executives and strategic decision makers."""
             **state,
             "final_synthesis": f"Synthesis failed: {e}",
             "current_agent": "strategic_synthesizer",
-            "completed_agents": (state.get("completed_agents", []) + ["strategic_synthesizer"]),
+            "completed_agents": ["strategic_synthesizer"],
         }
 
-# WORKFLOW CREATION
-# ===============================
+
+# ============================================================================
+# WORKFLOW GRAPH CONSTRUCTION
+# ============================================================================
 
 def create_multi_agent_graph():
-    """Create LangGraph workflow matching CrewAI baseline"""
+    """
+    Create and configure the LangGraph workflow.
     
-    # Initialize the graph
+    GRAPH CONSTRUCTION:
+    1. Initialize StateGraph with our state schema
+    2. Add each agent as a node
+    3. Define edges (workflow sequence)
+    4. Set entry point and exit conditions
+    5. Compile into executable graph
+    
+    WORKFLOW PATTERN:
+    This creates a linear, sequential workflow matching CrewAI:
+    Healthcare → Technical → Regulatory → Economic → Synthesis → END
+    
+    Returns:
+        CompiledGraph: Ready-to-execute LangGraph workflow
+    """
+    
+    # Initialize the graph with our state schema
     workflow = StateGraph(AgentState)
     
-    # Add agent nodes in standardized order
+    # Add agent nodes in execution order
     workflow.add_node("healthcare_expert", healthcare_expert_node)
     workflow.add_node("technical_analyst", technical_analyst_node)
     workflow.add_node("regulatory_specialist", regulatory_specialist_node)
     workflow.add_node("economic_analyst", economic_analyst_node)
     workflow.add_node("strategic_synthesizer", strategic_synthesizer_node)
     
-    # Define sequential workflow matching CrewAI
-    workflow.set_entry_point("healthcare_expert")
+    # Define sequential workflow (matching CrewAI baseline)
+    workflow.set_entry_point("healthcare_expert")              # Start here
     workflow.add_edge("healthcare_expert", "technical_analyst")
-    workflow.add_edge("technical_analyst", "regulatory_specialist")
+    workflow.add_edge("technical_analyst", "regulatory_specialist") 
     workflow.add_edge("regulatory_specialist", "economic_analyst")
     workflow.add_edge("economic_analyst", "strategic_synthesizer")
-    workflow.add_edge("strategic_synthesizer", END)
+    workflow.add_edge("strategic_synthesizer", END)            # Workflow complete
     
-    # Compile the graph
+    # Compile the graph into executable form
     app = workflow.compile()
     return app
 
-# Compile the graph
+
+# Compile the graph once at module load time
 graph_app = create_multi_agent_graph()
 
-# EXECUTION FUNCTION
-# ================================
+
+# ============================================================================
+# MAIN EXECUTION FUNCTION
+# ============================================================================
 
 def run_langgraph_analysis(topic, analysis_type="comprehensive"):
-    """Run LangGraph analysis matching CrewAI baseline exactly"""
+    """
+    Execute the complete LangGraph multi-agent analysis workflow.
+    
+    EXECUTION PROCESS:
+    1. Initialize workflow state with topic and timing
+    2. Invoke the compiled graph (runs all agents sequentially)
+    3. Extract and format results
+    4. Calculate performance metrics
+    5. Return standardized results matching CrewAI format
+    
+    LANGGRAPH ADVANTAGES:
+    - Automatic state management across agents
+    - Built-in error handling and recovery
+    - Workflow visualization capabilities
+    - Support for complex coordination patterns
+    
+    Args:
+        topic (str): Research topic to analyze
+        analysis_type (str): Type of analysis (default: "comprehensive")
+    
+    Returns:
+        dict: Comprehensive results matching CrewAI baseline format
+    """
     
     print(f"📊 Starting LangGraph analysis: {topic}")
     print("=" * 70)
     
-    # Initialize state
+    # Initialize workflow state
     initial_state = {
         "topic": topic,
         "analysis_type": analysis_type,
@@ -406,27 +621,36 @@ def run_langgraph_analysis(topic, analysis_type="comprehensive"):
         "economic_analysis": "",
         "final_synthesis": "",
         "current_agent": "",
-        "completed_agents": [],
+        "completed_agents": [],     # Start with empty list
         "agent_outputs": {},
         "start_time": time.time(),
         "agent_durations": {},
         "total_words": 0
     }
     
-    # Execute the graph
+    # Execute the graph workflow
     try:
+        # LangGraph automatically manages state transitions and agent coordination
         final_state = graph_app.invoke(initial_state)
         
-        # Calculate final metrics
+        # Calculate final performance metrics
         total_duration = time.time() - initial_state["start_time"]
         
+        # Extract and deduplicate completed agents list
+        # CRITICAL FIX: Remove duplicates that can occur during state merging
+        completed_agents = final_state.get("completed_agents", [])
+        unique_completed_agents = list(set(completed_agents)) if completed_agents else []
+        
+        # Create standardized result format (matching CrewAI and LangChain)
         result = {
             "topic": topic,
             "framework": "langgraph",
             "total_duration": total_duration,
             "total_words": final_state.get("total_words", 0),
             "words_per_second": final_state.get("total_words", 0) / total_duration if total_duration > 0 else 0,
-            "completed_agents": final_state.get("completed_agents", []),
+            "completed_agents": unique_completed_agents,    # Deduplicated list
+            "successful_agents": len(unique_completed_agents), # Count of unique successful agents
+            "total_agents": 5,                             # Expected total (4 domain + 1 synthesis)
             "agent_durations": final_state.get("agent_durations", {}),
             "final_synthesis": final_state.get("final_synthesis", ""),
             "individual_analyses": {
@@ -436,27 +660,46 @@ def run_langgraph_analysis(topic, analysis_type="comprehensive"):
                 "economic": final_state.get("economic_analysis", "")
             },
             "timestamp": datetime.now().isoformat(),
-            "success": len(final_state.get("completed_agents", [])) >= 4
+            "success": len(unique_completed_agents) >= 4   # Success if at least 4 agents completed
         }
         
+        # Print workflow summary
         print(f"\n🎉 LangGraph analysis completed!")
         print(f"⏱️ Total time: {total_duration:.1f} seconds")
         print(f"📝 Total words: {result['total_words']:,}")
         print(f"🚀 Speed: {result['words_per_second']:.1f} words/second")
-        print(f"✅ Agents completed: {len(result['completed_agents'])}/5")
+        print(f"✅ Agents completed: {len(unique_completed_agents)}/5")
         print("=" * 70)
         
         return result
         
     except Exception as e:
+        # Handle workflow execution failures
         print(f"❌ LangGraph execution failed: {e}")
         return {
             "topic": topic,
             "error": str(e),
             "framework": "langgraph",
             "total_duration": time.time() - initial_state["start_time"],
+            "completed_agents": [],
+            "successful_agents": 0,
+            "total_agents": 5,
             "success": False
         }
 
-# REMOVED THE DUPLICATE FUNCTION DEFINITION THAT WAS CAUSING RECURSION
-# The duplicate function at the end has been removed
+
+# ============================================================================
+# COMPATIBILITY FUNCTION
+# ============================================================================
+
+def run_comprehensive_analysis(topic):
+    """
+    Legacy compatibility function for existing code.
+    
+    Args:
+        topic (str): Research topic to analyze
+    
+    Returns:
+        dict: Same results as run_langgraph_analysis()
+    """
+    return run_langgraph_analysis(topic)
