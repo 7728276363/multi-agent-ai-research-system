@@ -7,7 +7,7 @@ A professional AI development environment with Docker containers for comparing A
 ### Prerequisites
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
 - NVIDIA GPU with [NVIDIA Docker support](https://github.com/NVIDIA/nvidia-docker) (optional, for GPU acceleration)
-- Please see my [a relative link: NVIDIA_CUDA_Guide.md]
+- Please see the included NVIDIA_CUDA_Guide.md file
 
 ### One-Command Setup
 ```bash
